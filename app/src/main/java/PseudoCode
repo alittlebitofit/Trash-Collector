@@ -1,4 +1,4 @@
 1- Extract text from url image = DONE
-2- Extract text from device image
+2- Extract text from device image = DONE
 3- Sort the extracted text
 4- Add it to database and use WorkManager on it
