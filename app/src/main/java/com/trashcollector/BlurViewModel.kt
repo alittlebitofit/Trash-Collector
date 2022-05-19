@@ -17,14 +17,28 @@
 package com.trashcollector
 
 import android.app.Application
+import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.work.*
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.trashcollector.workers.BlurWorker
 import com.trashcollector.workers.CleanupWorker
 import com.trashcollector.workers.SaveImageToFileWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import java.io.IOException
+import java.net.URL
 
+const val TAG_BlurViewModel = "BlurViewModelActivity1"
 class BlurViewModel(application: Application) : AndroidViewModel(application) {
 
     internal var imageUri: Uri? = null
@@ -45,6 +59,66 @@ class BlurViewModel(application: Application) : AndroidViewModel(application) {
         workManager.cancelUniqueWork(IMAGE_MANIPULATION_WORK_NAME)
     }
 
+
+    fun textExtractor(context: Context, resourceUri: String?): Text? {
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        var returnValue: Text? = null
+        GlobalScope.launch(Dispatchers.IO) {
+            // ...
+            try {
+                val url =
+                    URL("https://docs.unity3d.com/Packages/com.unity.textmeshpro@3.2/manual/images/TMP_RichTextLineIndent.png")
+//                val bitmap = BitmapFactory.decodeStream(url.openConnection().getInputStream())
+                val resolver = context.contentResolver
+                val bitmap = BitmapFactory.decodeStream(resolver.openInputStream(Uri.parse(resourceUri)))
+                val image = InputImage.fromBitmap(bitmap, 0)
+
+
+                val result = recognizer.process(image)
+                    .addOnSuccessListener { visionText ->
+
+                        returnValue = visionText
+                        // Task completed successfully
+//                    Toast.makeText(baseContext, visionText.toString(), Toast.LENGTH_SHORT).show()
+                        Log.d(TAG_BlurViewModel, "visionText.text.toString(): ${visionText.text.toString()}")
+
+                        val resultText = visionText.text
+                        Toast.makeText(context, resultText, Toast.LENGTH_SHORT).show()
+//                        Log.d(TAG_BlurViewModel, "resultText: $resultText")
+
+                        for (block in visionText.textBlocks) {
+                            val blockText = block.text
+//                            Log.d(TAG_BlurViewModel, "blockText: $blockText")
+                            for (line in block.lines) {
+                                val lineText = line.text
+//                                Log.d(TAG_BlurViewModel, "lineText: $lineText")
+                                for (element in line.elements) {
+                                    val elementText = element.text
+//                                    Log.d(TAG_BlurViewModel, "elementText: $elementText")
+                                }
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        // Task failed with an exception
+//                        Toast.makeText(context, "on failure listener", Toast.LENGTH_SHORT)
+//                            .show()
+                        e.printStackTrace()
+                    }
+
+                Log.d(TAG_BlurViewModel, "result: $result")
+//                Toast.makeText(context, "result", Toast.LENGTH_SHORT).show()
+            } catch (e: IOException) {
+//                Toast.makeText(context, "failed", Toast.LENGTH_SHORT).show()
+                e.printStackTrace()
+            }
+        }
+
+        return returnValue
+    }
+
+
     /**
      * Creates the input data bundle which includes the Uri to operate on
      * @return Data which contains the Image Uri as a String
@@ -64,11 +138,11 @@ class BlurViewModel(application: Application) : AndroidViewModel(application) {
     internal fun applyBlur(blurLevel: Int) {
         // Add WorkRequest to Cleanup temporary images
         var continuation = workManager
-                .beginUniqueWork(
-                        IMAGE_MANIPULATION_WORK_NAME,
-                        ExistingWorkPolicy.REPLACE,
-                        OneTimeWorkRequest.from(CleanupWorker::class.java)
-                )
+            .beginUniqueWork(
+                IMAGE_MANIPULATION_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequest.from(CleanupWorker::class.java)
+            )
 
         // Add WorkRequests to blur the image the number of times requested
         for (i in 0 until blurLevel) {
@@ -87,14 +161,14 @@ class BlurViewModel(application: Application) : AndroidViewModel(application) {
 
         // Create charging constraint
         val constraints = Constraints.Builder()
-                .setRequiresCharging(true)
-                .build()
+            .setRequiresCharging(true)
+            .build()
 
         // Add WorkRequest to save the image to the filesystem
         val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
-                .setConstraints(constraints)
-                .addTag(TAG_OUTPUT)
-                .build()
+            .setConstraints(constraints)
+            .addTag(TAG_OUTPUT)
+            .build()
         continuation = continuation.then(save)
 
         // Actually start the work

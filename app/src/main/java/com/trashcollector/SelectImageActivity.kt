@@ -23,6 +23,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -150,6 +151,7 @@ class SelectImageActivity : AppCompatActivity() {
         }
 
         val filterIntent = Intent(this, BlurActivity::class.java)
+        Log.d("SelectImageActivity1", "imageUri: ${imageUri.toString()} + KEY_IMAGE_URI: $KEY_IMAGE_URI")
         filterIntent.putExtra(KEY_IMAGE_URI, imageUri.toString())
         startActivity(filterIntent)
     }
